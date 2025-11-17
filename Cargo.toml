@@ -1,0 +1,8 @@
+[workspace]
+members = [
+	"crates/evalcraft-core",
+	"crates/evalcraft-cli",
+]
+resolver = "2"
+
+

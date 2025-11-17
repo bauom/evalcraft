@@ -1,0 +1,45 @@
+[package]
+name = "evalcraft-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Lightweight agent evaluation core. Data → Task → Score."
+repository = ""
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+strsim = "0.11"
+thiserror = "1.0"
+tokio = { version = "1.38", features = ["fs", "macros", "rt-multi-thread"] }
+regex = "1.10"
+jsonschema = "0.18"
+sqlparser = "0.52"
+chrono = "0.4.42"
+reqwest = "0.12.24"
+
+[dev-dependencies]
+async-openai = "0.23"
+
+[features]
+sync-fs = []
+
+[[example]]
+name = "library_usage"
+path = "../../examples/library_usage.rs"
+
+[[example]]
+name = "llm_testing_example"
+path = "../../examples/llm_testing_example.rs"
+
+[[example]]
+name = "openai_example"
+path = "../../examples/openai_example.rs"
+required-features = []
+
+[[example]]
+name = "localhost_llm"
+path = "../../examples/localhost_llm.rs"

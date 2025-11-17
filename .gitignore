@@ -1,0 +1,19 @@
+target/
+
+# Rust / Cargo
+**/*.rs.bk
+**/*~
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Evalcraft run artifacts
+*_results_*.json
+
+

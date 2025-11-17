@@ -1,0 +1,6 @@
+{"id":"capital_france","input":"What is the capital of France?","expected":"Paris"}
+{"id":"capital_germany","input":"What is the capital of Germany?","expected":"Berlin"}
+{"id":"math_simple","input":"What is 2 + 2?","expected":"4"}
+{"id":"email_format","input":"Extract email from: Contact us at hello@example.com","expected":"hello@example.com"}
+{"id":"json_extract","input":"Convert to JSON: John is 30 years old","expected":{"name":"John","age":30}}
+

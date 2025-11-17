@@ -1,0 +1,6 @@
+{"id":"simple_select","input":"Get all users","expected":"SELECT * FROM users"}
+{"id":"where_clause","input":"Get users over 18","expected":"SELECT * FROM users WHERE age > 18"}
+{"id":"join","input":"Get users with orders","expected":"SELECT u.name, o.id FROM users u JOIN orders o ON u.id = o.user_id"}
+{"id":"insert","input":"Add new user John","expected":"INSERT INTO users (name, age) VALUES ('John', 30)"}
+{"id":"aggregate","input":"Count users by city","expected":"SELECT city, COUNT(*) FROM users GROUP BY city"}
+

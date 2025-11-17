@@ -1,0 +1,6 @@
+{"id":"capital_france","input":"What is the capital of France?","expected":"Paris"}
+{"id":"capital_germany","input":"What is the capital of Germany?","expected":"Berlin"}
+{"id":"math","input":"What is 15 + 27?","expected":"42"}
+{"id":"color_sky","input":"What color is the sky?","expected":"blue"}
+{"id":"planets","input":"How many planets are in our solar system?","expected":"8"}
+

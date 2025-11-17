@@ -1,0 +1,6 @@
+{"id":"capital_france","input":"What is the capital of France?","expected":"Paris"}
+{"id":"capital_germany","input":"What is the capital of Germany?","expected":"Berlin"}
+{"id":"capital_italy","input":"What is the capital of Italy?","expected":"Rome"}
+{"id":"capital_spain","input":"What is the capital of Spain?","expected":"Madrid"}
+{"id":"capital_uk","input":"What is the capital of the UK?","expected":"London"}
+

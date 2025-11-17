@@ -1,0 +1,6 @@
+{"id":"email","input":"Extract email from: Contact us at support@example.com","expected":"support@example.com"}
+{"id":"phone","input":"Call me at 555-123-4567","expected":"555-123-4567"}
+{"id":"date","input":"Meeting on 2024-11-12","expected":"2024-11-12"}
+{"id":"url","input":"Visit https://example.com/path","expected":"https://example.com/path"}
+{"id":"ssn","input":"SSN: 123-45-6789","expected":"123-45-6789"}
+

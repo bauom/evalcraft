@@ -1,0 +1,6 @@
+{"id":"valid_user","input":"Extract user info: John Doe is 30 years old","expected":{"name":"John Doe","age":30}}
+{"id":"valid_product","input":"Product: Laptop costs $999","expected":{"product":"Laptop","price":999}}
+{"id":"missing_field","input":"Only name: Jane","expected":{"name":"Jane","age":25}}
+{"id":"wrong_type","input":"Age as string","expected":{"name":"Bob","age":"25"}}
+{"id":"nested_object","input":"User with address","expected":{"name":"Alice","address":{"city":"Paris","country":"France"}}}
+
