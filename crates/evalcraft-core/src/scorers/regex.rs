@@ -64,44 +64,44 @@ impl Scorer for RegexScorer {
 mod tests {
 	use super::*;
 
-	#[test]
-	fn test_regex_match() {
+	#[tokio::test]
+	async fn test_regex_match() {
 		let scorer = RegexScorer::new(r"capital.*Paris").unwrap();
 		let output = serde_json::json!("The capital of France is Paris");
 		let expected = serde_json::json!("");
-		let score = scorer.score(&expected, &output).unwrap();
+		let score = scorer.score(&expected, &output).await.unwrap();
 		assert!(score.passed);
-		assert_eq!(score.score, 1.0);
+		assert_eq!(score.value, 1.0);
 	}
 
-	#[test]
-	fn test_regex_no_match() {
+	#[tokio::test]
+	async fn test_regex_no_match() {
 		let scorer = RegexScorer::new(r"capital.*London").unwrap();
 		let output = serde_json::json!("The capital of France is Paris");
 		let expected = serde_json::json!("");
-		let score = scorer.score(&expected, &output).unwrap();
+		let score = scorer.score(&expected, &output).await.unwrap();
 		assert!(!score.passed);
-		assert_eq!(score.score, 0.0);
+		assert_eq!(score.value, 0.0);
 	}
 
-	#[test]
-	fn test_regex_email() {
+	#[tokio::test]
+	async fn test_regex_email() {
 		let scorer = RegexScorer::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
 		let output = serde_json::json!("user@example.com");
 		let expected = serde_json::json!("");
-		let score = scorer.score(&expected, &output).unwrap();
+		let score = scorer.score(&expected, &output).await.unwrap();
 		assert!(score.passed);
-		assert_eq!(score.score, 1.0);
+		assert_eq!(score.value, 1.0);
 	}
 
-	#[test]
-	fn test_regex_with_capture_groups() {
+	#[tokio::test]
+	async fn test_regex_with_capture_groups() {
 		let scorer = RegexScorer::new(r"(\d{4})-(\d{2})-(\d{2})").unwrap();
 		let output = serde_json::json!("Date: 2024-11-12");
 		let expected = serde_json::json!("");
-		let score = scorer.score(&expected, &output).unwrap();
+		let score = scorer.score(&expected, &output).await.unwrap();
 		assert!(score.passed);
-		assert_eq!(score.score, 1.0);
+		assert_eq!(score.value, 1.0);
 	}
 }
 

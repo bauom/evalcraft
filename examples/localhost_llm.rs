@@ -64,7 +64,7 @@ async fn run_localhost_llm() -> anyhow::Result<()> {
             let prompt = input.as_str().unwrap_or_default();
             let system_prompt =
                 "You are a helpful assistant. try to reply to answers as concise as possible, 1 word is enough.";
-            let response = call_OAI_Compat(system_prompt, prompt, model).await?;
+            let response = call_oai_compat(system_prompt, prompt, model).await?;
             Ok(json!(response))
         }
     });
@@ -117,7 +117,7 @@ async fn run_localhost_llm() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn call_OAI_Compat(system_prompt: &str, prompt: &str, model: &str) -> anyhow::Result<String> {
+async fn call_oai_compat(system_prompt: &str, prompt: &str, model: &str) -> anyhow::Result<String> {
     let client = Client::new();
 
     let response = client
