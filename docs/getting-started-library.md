@@ -71,7 +71,7 @@ async fn main() -> Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(4)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());

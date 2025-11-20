@@ -56,7 +56,7 @@ async fn run_exact_match_example() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(4)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -107,7 +107,7 @@ async fn run_multiple_scorers_example() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(2)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -170,7 +170,7 @@ async fn run_json_validation_example() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(2)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -222,7 +222,7 @@ async fn run_regex_example() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(2)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());

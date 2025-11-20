@@ -53,13 +53,13 @@ impl EvalBuilder {
 		self
 	}
 
-	pub fn build(self) -> Eval {
-		Eval {
-			data_source: self.data_source.expect("data_source must be set"),
-			task: self.task.expect("task must be set"),
+	pub fn build(self) -> Result<Eval> {
+		Ok(Eval {
+			data_source: self.data_source.ok_or_else(|| anyhow::anyhow!("data_source must be set"))?,
+			task: self.task.ok_or_else(|| anyhow::anyhow!("task must be set"))?,
 			scorers: self.scorers,
 			concurrency: self.concurrency,
-		}
+		})
 	}
 }
 

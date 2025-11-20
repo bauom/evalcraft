@@ -65,7 +65,7 @@ async fn run_openai_eval() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(3) // Respect OpenAI rate limits
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
 

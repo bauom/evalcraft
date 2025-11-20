@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(8)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }))
             .scorers(scorers)
-            .build();
+            .build()?;
         let result = eval.run().await?;
         println!("{}", result.summary_table());
     }

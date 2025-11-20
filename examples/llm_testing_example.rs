@@ -94,7 +94,7 @@ async fn test_with_mock_llm() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(3)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -153,7 +153,7 @@ async fn test_with_http_llm() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(1)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -208,7 +208,7 @@ async fn test_factual_qa() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(1)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -258,7 +258,7 @@ async fn test_structured_output() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(1)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());
@@ -299,7 +299,7 @@ async fn test_format_validation() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(1)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
     println!("{}", result.summary_table());

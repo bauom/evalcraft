@@ -187,7 +187,7 @@ async fn run(args: RunArgs) -> Result<()> {
 		.task(task)
 		.scorers(scorers)
 		.concurrency(args.concurrency)
-		.build();
+		.build()?;
 
 	let result = eval.run().await?;
 	println!("{}", result.summary_table());

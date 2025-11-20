@@ -81,7 +81,7 @@ async fn run_localhost_llm() -> anyhow::Result<()> {
         .task(task)
         .scorers(scorers)
         .concurrency(1)
-        .build();
+        .build()?;
 
     let result = eval.run().await?;
 

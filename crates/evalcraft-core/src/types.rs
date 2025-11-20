@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tabled::{Table, Tabled};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestCase {
@@ -50,6 +51,16 @@ pub struct EvalResult {
 	pub summary: EvalSummary,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Tabled)]
+struct SummaryRow {
+	id: String,
+	passed: String,
+	avg_score: f64,
+	input: String,
+	output: String,
+	expected: String,
+}
+
 impl EvalResult {
 	pub fn summarize(cases: &[CaseResult]) -> EvalSummary {
 		let total = cases.len();
@@ -75,19 +86,7 @@ impl EvalResult {
 	}
 
 	pub fn summary_table(&self) -> String {
-		// Simple tabular text output; avoid external table crates for minimal deps.
-		let mut out = String::new();
-		let header = [
-			"id",
-			"passed",
-			"avg_score",
-			"input",
-			"output",
-			"expected",
-		];
-		out.push_str(&header.join("\t"));
-		out.push('\n');
-		for cr in &self.cases {
+		let rows: Vec<SummaryRow> = self.cases.iter().map(|cr| {
 			let id = cr.case.id.clone().unwrap_or_else(|| "-".to_string());
 			let passed = if !cr.scores.is_empty() && cr.scores.iter().all(|s| s.passed) { "✓" } else { " " };
 			let avg = if cr.scores.is_empty() {
@@ -96,23 +95,29 @@ impl EvalResult {
 				let sum: f64 = cr.scores.iter().map(|s| s.value).sum();
 				sum / (cr.scores.len() as f64)
 			};
-			let input = truncate(value_preview(&cr.case.input), 64);
-			let output = truncate(value_preview(&cr.output), 64);
-			let expected = truncate(value_preview(&cr.case.expected), 64);
-			out.push_str(&format!(
-				"{}\t{}\t{:.3}\t{}\t{}\t{}\n",
-				id, passed, avg, input, output, expected
-			));
-		}
-		out.push('\n');
-		out.push_str(&format!(
-			"Total: {}  Passed: {}  Pass rate: {:.1}%  Avg score: {:.3}\n",
+			
+			SummaryRow {
+				id,
+				passed: passed.to_string(),
+				avg_score: avg,
+				input: truncate(value_preview(&cr.case.input), 64),
+				output: truncate(value_preview(&cr.output), 64),
+				expected: truncate(value_preview(&cr.case.expected), 64),
+			}
+		}).collect();
+
+		let mut table = Table::new(rows);
+		let table_str = table.to_string();
+
+		let summary_text = format!(
+			"Total: {}  Passed: {}  Pass rate: {:.1}%  Avg score: {:.3}",
 			self.summary.total,
 			self.summary.passed,
 			self.summary.pass_rate * 100.0,
 			self.summary.avg_score
-		));
-		out
+		);
+
+		format!("{}\n\n{}\n", table_str, summary_text)
 	}
 }
 
@@ -131,5 +136,6 @@ fn truncate(s: String, max_len: usize) -> String {
 	truncated.push('…');
 	truncated
 }
+
 
 
