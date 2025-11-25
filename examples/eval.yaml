@@ -1,0 +1,25 @@
+task:
+  type: http
+  url: "http://localhost:3000/echo"
+  method: POST
+
+data:
+  path: "examples/data.jsonl"
+
+scorers:
+  - type: exact
+  - type: levenshtein
+    threshold: 0.8
+  - type: contains
+    substring: "World"
+    case_sensitive: false
+  - type: regex
+    pattern: ".*World.*"
+  - type: json
+  # - type: json_schema
+  #   path: "examples/json_schema.json"
+  # - type: sql
+  #   dialect: postgres
+
+concurrency: 4
+

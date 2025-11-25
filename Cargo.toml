@@ -2,6 +2,8 @@
 members = [
 	"crates/evalcraft-core",
 	"crates/evalcraft-cli",
+	"crates/evalcraft-store",
+	"crates/evalcraft-types",
 ]
 resolver = "2"
 

@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Lightweight agent evaluation core. Data → Task → Score."
-repository = ""
 
 [dependencies]
 anyhow = "1.0"
@@ -21,12 +20,22 @@ sqlparser = "0.52"
 chrono = "0.4.42"
 reqwest = "0.12.24"
 tabled = "0.20.0"
+serde_yaml = "0.9.34"
+evalcraft-types = { path = "../evalcraft-types" }
+
+# Optional dependencies
+evalcraft-store = { path = "../evalcraft-store", optional = true }
 
 [dev-dependencies]
 async-openai = "0.23"
+evalcraft-store = { path = "../evalcraft-store" }
 
 [features]
 sync-fs = []
+default = [] # Make sure evalcraft-store is NOT default, or IS default?
+# If we want implicit persistence by default when using the CLI, we might want it.
+# But core library should probably not pull it in by default.
+persistence = ["dep:evalcraft-store"]
 
 [[example]]
 name = "library_usage"
@@ -44,3 +53,19 @@ required-features = []
 [[example]]
 name = "localhost_llm"
 path = "../../examples/localhost_llm.rs"
+
+[[example]]
+name = "test_example"
+path = "../../examples/test_example.rs"
+
+[[example]]
+name = "tracing_example"
+path = "../../examples/tracing_example.rs"
+
+[[example]]
+name = "generate_traced_report"
+path = "../../examples/generate_traced_report.rs"
+
+[[example]]
+name = "sqlite_persistence"
+path = "../../examples/sqlite_persistence.rs"

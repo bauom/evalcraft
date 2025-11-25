@@ -5,6 +5,7 @@ This document focuses on **LLM‑centric workflows**:
 - Using HTTP endpoints as tasks (LLMs, agents, services).
 - Evaluating localhost OpenAI‑compatible servers.
 - Semantic scoring with embeddings via `EmbeddingScorer`.
+- Capturing detailed **traces** (per‑call metadata) and generating HTML reports.
 
 ---
 
@@ -209,6 +210,30 @@ Now each case will get both:
 
 ---
 
+## Traces: capturing per‑call metadata
+
+For LLM‑heavy workloads, it’s often useful to capture more than just final outputs:
+
+- Prompt and response JSON.
+- Model name and latency.
+- Token usage (input/output/total).
+
+Evalcraft’s tracing system (`trace` module) provides:
+
+- `Trace` – a serializable record of a single model/tool call.
+- `TokenUsage` – token accounting.
+- `Trace::start_now().model(...).id(...)` – builder API for timed traces.
+- `report_trace(trace)` – attach a trace to the **current case** while the eval is running.
+
+When you call `report_trace`, traces end up in `CaseResult.traces`, and are:
+
+- Persisted by `evalcraft-store` (into the `traces` table).
+- Rendered by `generate_html_report` in the HTML report.
+
+See `examples/tracing_example.rs` for a complete, runnable demo.
+
+---
+
 ## Combining scorers for robust evaluation
 
 For LLM QA tasks, a practical combo is:
@@ -238,12 +263,17 @@ To understand how your LLM and scorers behave:
   - `Score.value` for each scorer.
   - Whether `passed` is what you expect.
   - `EvalSummary.pass_rate` and `avg_score`.
-- Adjust thresholds and scorers based on what you consider “acceptable” model behavior.
+- Inspect **traces** (if you use `report_trace`) to see:
+  - Exact prompts and structured inputs you sent.
+  - Raw model responses.
+  - Latency and token usage.
+- Adjust thresholds, prompts, and scorers based on what you consider “acceptable” model behavior.
 
 Because `EvalResult` is serializable, you can:
 
 - Save it as JSON.
 - Feed it into notebooks, dashboards, or visualization tools.
-- Build higher‑level reports or regression tests around it.
+- Render it as an interactive HTML report via `generate_html_report`.
+- Persist it (and traces) into SQLite with `evalcraft-store` for long‑term analysis.
 
 

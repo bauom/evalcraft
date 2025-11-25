@@ -160,3 +160,137 @@ The core crate exposes `EmbeddingScorer`; you pass in an async embedding closure
   - `scores` – vector of `Score` (one per scorer).
 
 You can serialize `EvalResult` to JSON with `serde_json` and save or post‑process it.
+
+---
+
+## 7. Using evals in tests
+
+The `testing` module exposes helpers for writing concise evaluation tests:
+
+- `assert_eval_all_passed(&EvalResult)` – fail if any case failed.
+- `assert_eval_pass_rate(&EvalResult, min_pass_rate)` – enforce a minimum pass rate.
+- `assert_eval_avg_score(&EvalResult, min_avg_score)` – enforce a minimum average score.
+
+Example (simplified from `examples/test_example.rs`):
+
+```rust
+use std::sync::Arc;
+use evalcraft_core::*;
+use serde_json::json;
+
+#[tokio::test]
+async fn test_echo_agent_exact_match() -> anyhow::Result<()> {
+    async fn echo_agent(input: &str) -> anyhow::Result<String> {
+        Ok(format!("{input} World!"))
+    }
+
+    let task = from_async_fn(|input| {
+        let input = input.clone();
+        async move {
+            let s = input.as_str().unwrap_or_default();
+            Ok(json!(echo_agent(s).await?))
+        }
+    });
+
+    let cases = vec![
+        TestCase::with_id("0", json!("Hello"), json!("Hello World!")),
+        TestCase::with_id("1", json!("Hi"), json!("Hi World!")),
+    ];
+    let data = Arc::new(VecDataSource::new(cases));
+
+    let scorers: Vec<Arc<dyn Scorer>> = vec![Arc::new(ExactMatchScorer)];
+
+    let eval = Eval::builder()
+        .data_source(data)
+        .task(task)
+        .scorers(scorers)
+        .concurrency(4)
+        .build()?;
+
+    let result = eval.run().await?;
+    assert_eval_all_passed(&result)?;
+    Ok(())
+}
+```
+
+This pattern lets you treat evaluation as just another test, with rich diagnostics when thresholds are not met.
+
+---
+
+## 8. Capturing traces and HTML reports
+
+For LLM‑style tasks, you can capture **per‑call traces** (inputs, outputs, timing, token usage) and later turn them into an HTML report.
+
+Key pieces:
+
+- `Trace` and `TokenUsage` – describe a single model/tool call.
+- `report_trace(trace)` – attach a trace to the current case.
+- `generate_html_report(&EvalResult)` – turn an `EvalResult` (including traces) into a standalone HTML page.
+
+Example tracing flow (see `examples/tracing_example.rs` and `examples/generate_traced_report.rs`):
+
+1. Wrap your LLM call with a `Trace`:
+
+   ```rust
+   async fn mock_llm_call(prompt: &str) -> anyhow::Result<String> {
+       let trace_builder = Trace::start_now()
+           .model("gpt-4o-mini")
+           .id("call-1");
+
+       // ... call your model ...
+
+       let trace = trace_builder.finish(
+           json!({ "prompt": prompt }),
+           json!({ "response": response }),
+           Some(TokenUsage {
+               input_tokens: 20,
+               output_tokens: 10,
+               total_tokens: 30,
+           }),
+       );
+
+       report_trace(trace);
+       Ok(response.to_string())
+   }
+   ```
+
+2. Run your eval as usual; traces are attached to each `CaseResult`.
+
+3. Serialize the full `EvalResult` to JSON (e.g. `traced_results.json`).
+
+4. In a separate step, generate an HTML report:
+
+   ```rust
+   use std::fs;
+   use evalcraft_core::{EvalResult, generate_html_report};
+
+   let json = fs::read_to_string("traced_results.json")?;
+   let result: EvalResult = serde_json::from_str(&json)?;
+   let html = generate_html_report(&result);
+   fs::write("traced_report.html", html)?;
+   ```
+
+Open `traced_report.html` in a browser to inspect cases, scores, and individual traces interactively.
+
+---
+
+## 9. Persisting results to SQLite
+
+To keep a history of evaluation runs, use the `evalcraft-store` crate:
+
+```rust
+use evalcraft_store::Store;
+
+let store = Store::open("eval_history.db")?;
+let run_id = store.create_run(Some(json!({
+    "environment": "local",
+    "user": "example_runner"
+})))?;
+
+let eval_id = store.save_eval(run_id, "Capital Cities Eval", &result)?;
+println!("Saved eval with id: {}", eval_id);
+```
+
+This writes into a small SQLite schema (`runs`, `evals`, `results`, `scores`, `traces`) that you can explore with `sqlite3` or your own tools.  
+See `examples/sqlite_persistence.rs` for a complete example, and `docs/getting-started-cli.md` for how the CLI wires this up automatically via `EVALCRAFT_DB_PATH`.
+

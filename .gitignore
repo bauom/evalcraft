@@ -15,5 +15,6 @@ target/
 
 # Evalcraft run artifacts
 *_results_*.json
+eval_history.db
 
 

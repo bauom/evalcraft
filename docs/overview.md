@@ -100,25 +100,46 @@ evalcraft ships with several scorers out of the box (see `docs/scorers.md`).
 
 ### `evalcraft-core` (library)
 
-Provides:
+Provides the core evaluation engine:
 
-- Traits: `DataSource`, `Task`, `Scorer`.
-- Types: `TestCase`, `Score`, `CaseResult`, `EvalSummary`, `EvalResult`.
-- Runners: `Eval`, `EvalBuilder`.
-- Built‑in scorers: exact match, Levenshtein, contains, regex, JSON validation, SQL validation, embedding‑based.
+- **Traits**: `DataSource`, `Task`, `Scorer`.
+- **Types**: `TestCase`, `Score`, `CaseResult`, `EvalSummary`, `EvalResult`.
+- **Runners**: `Eval`, `EvalBuilder`.
+- **Built‑in scorers**: exact match, Levenshtein, contains, regex, JSON validation, SQL validation, embedding‑based.
+- **Config types** (`config` module): `EvalConfig`, `TaskConfig`, `DataConfig`, `ScorerConfig` – useful if you want to drive evals from YAML/JSON config files (see `examples/demo_eval.yaml` and `examples/eval.yaml`).
+- **Testing helpers** (`testing` module): `assert_eval_all_passed`, `assert_eval_pass_rate`, `assert_eval_avg_score` – for writing `#[tokio::test]`‑style evals.
+- **Tracing support** (`trace` module): `Trace`, `TokenUsage`, `report_trace`, `scope_traces` – capture per‑case LLM/tool call traces.
+- **Reporting** (`report` module): `generate_html_report` – render an `EvalResult` (including traces) as a standalone HTML report.
 
 ### `evalcraft-cli` (binary)
 
 Small CLI on top of `evalcraft-core` that:
 
-- Reads test cases from a JSONL file.
-- Uses either:
-  - a built‑in “echo” task, or
-  - an HTTP task endpoint (`--http-url`) for LLMs / remote services.
-- Lets you configure scorers via flags (e.g. `--exact`, `--levenshtein`, `--regex`, `--json`, `--sql`, etc.).
-- Prints the summary table and optionally writes full results to JSON.
+- Runs your Rust eval tests and examples via `cargo test`.
+- Enables the `evalcraft-core/persistence` feature automatically.
+- Wires `EVALCRAFT_DB_PATH` so runs can be persisted to SQLite.
+- Supports a watch mode for rapid iteration.
 
-See `docs/getting-started-cli.md` for examples.
+See `docs/getting-started-cli.md` for details.
+
+### `evalcraft-store` (SQLite persistence)
+
+Lightweight wrapper around SQLite for **storing eval runs**:
+
+- Opens/initializes a DB via `Store::open("eval_history.db")`.
+- Creates tables for `runs`, `evals`, `results`, `scores`, and `traces`.
+- Persists full `EvalResult` values (including traces) via `Store::save_eval`.
+
+Used by examples like `examples/sqlite_persistence.rs`, and designed to back dashboards or offline analysis.
+
+### `evalcraft-types` (shared data types)
+
+Small crate with **shared, serializable types**:
+
+- Core result/summary types used by `evalcraft-core` and `evalcraft-store`.
+- Trace‑related types: `Trace`, `TokenUsage`, `TraceBuilder`.
+
+You normally don’t depend on this directly; it is re‑exported via `evalcraft-core` and used internally by `evalcraft-store`.
 
 ---
 

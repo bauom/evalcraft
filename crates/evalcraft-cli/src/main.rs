@@ -1,203 +1,229 @@
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::process::Command;
+use evalcraft_store::Store;
 
-use anyhow::Result;
-use clap::{ArgAction, Parser, Subcommand};
-use evalcraft_core::{
-	from_async_fn, Eval, ExactMatchScorer, JsonlDataSource, LevenshteinScorer, Scorer,
-	ContainsScorer, RegexScorer, JsonScorer, SqlScorer, SqlDialect,
-};
-use serde_json::json;
-
-#[derive(Debug, Parser)]
-#[command(name = "evalcraft", about = "Run agent and LLM evaluations")]
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
 struct Cli {
-	#[command(subcommand)]
-	command: Commands,
+    #[command(subcommand)]
+    command: Option<Commands>,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 enum Commands {
-	Run(RunArgs),
-}
+    /// Run evaluations
+    Run {
+        /// Run in watch mode
+        #[arg(short, long)]
+        watch: bool,
 
-#[derive(Debug, Clone, Parser)]
-struct RunArgs {
-	/// JSONL file containing lines with fields: { "id"?: string, "input": any, "expected": any }
-	#[arg(long)]
-	data: PathBuf,
+        /// Filter tests by name
+        #[arg(short, long)]
+        filter: Option<String>,
 
-	/// Concurrency (cases in-flight)
-	#[arg(long, default_value_t = 8)]
-	concurrency: usize,
-
-	/// Use exact-match scorer
-	#[arg(long, action = ArgAction::SetTrue)]
-	exact: bool,
-
-	/// Use Levenshtein scorer with given min similarity (0.0..=1.0)
-	#[arg(long)]
-	levenshtein: Option<f64>,
-
-	/// Check if output contains substring (case-sensitive)
-	#[arg(long)]
-	contains: Option<String>,
-
-	/// Check if output contains substring (case-insensitive)
-	#[arg(long)]
-	contains_i: Option<String>,
-
-	/// Validate output matches regex pattern
-	#[arg(long)]
-	regex: Option<String>,
-
-	/// Validate output is valid JSON
-	#[arg(long, action = ArgAction::SetTrue)]
-	json: bool,
-
-	/// Validate output JSON against a schema file
-	#[arg(long)]
-	json_schema: Option<PathBuf>,
-
-	/// Validate output is valid SQL (generic dialect)
-	#[arg(long, action = ArgAction::SetTrue)]
-	sql: bool,
-
-	/// SQL dialect: generic, postgres, mysql, sqlite
-	#[arg(long, default_value = "generic")]
-	sql_dialect: String,
-
-	/// Output JSON result to a file
-	#[arg(long)]
-	json_out: Option<PathBuf>,
-
-	/// HTTP task endpoint (POST by default). Sends { "input": <value> } and expects JSON response.
-	#[arg(long)]
-	http_url: Option<String>,
-
-	/// HTTP method for --http-url (GET or POST)
-	#[arg(long, default_value = "POST")]
-	http_method: String,
+        /// Path to search for tests (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-	let cli = Cli::parse();
-	match cli.command {
-		Commands::Run(args) => run(args).await?,
-	}
-	Ok(())
+async fn main() -> anyhow::Result<()> {
+    // Initialize logging
+    tracing_subscriber::fmt::init();
+
+    let cli = Cli::parse();
+
+    // Initialize/Ensure the store exists for this run
+    // In a real app, we might want to locate this relative to the project root
+    let _store = Store::open("eval_history.db")?;
+
+    match &cli.command {
+        Some(Commands::Run { watch, filter, path }) => {
+            if *watch {
+                run_watch_mode(path, filter.as_deref()).await?;
+            } else {
+                run_once(path, filter.as_deref()).await?;
+            }
+        }
+        None => {
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+        }
+    }
+
+    Ok(())
 }
 
-async fn run(args: RunArgs) -> Result<()> {
-	let data = Arc::new(JsonlDataSource::new(&args.data));
+async fn run_once(_path: &PathBuf, filter: Option<&str>) -> anyhow::Result<()> {
+    // For Approach 1: We assume the user has defined examples/tests in Cargo.toml.
+    // We will run `cargo test` (or `cargo run --example`) and let the output stream to stdout.
+    // To enable "Implicit Persistence", we set an environment variable `EVALCRAFT_DB_PATH`.
+    // The `evalcraft-core` library (used by the user's test) will detect this var and write to it.
 
-	let task = if let Some(url) = args.http_url {
-		let method = args.http_method.to_uppercase();
-		from_async_fn(move |input| {
-			let url = url.clone();
-			let method = method.clone();
-			let input = input.clone();
-			async move {
-				let client = reqwest::Client::new();
-				let resp = match method.as_str() {
-					"GET" => {
-						// Encode input as query ?input=<json>
-						let q = [("input", input.to_string())];
-						client.get(&url).query(&q).send().await?
-					}
-					_ => {
-						client.post(&url).json(&json!({ "input": input })).send().await?
-					}
-				};
-				let status = resp.status();
-				let v = resp.json::<serde_json::Value>().await?;
-				if !status.is_success() {
-					anyhow::bail!("HTTP {}: {}", status.as_u16(), v);
-				}
-				Ok(v)
-			}
-		})
-	} else {
-		// Default "echo" task: append " World!" to string inputs
-		from_async_fn(|input| {
-			let input = input.clone();
-			async move {
-				let s = input.as_str().unwrap_or_default();
-				Ok(json!(format!("{s} World!")))
-			}
-		})
-	};
+    println!("🚀 Starting evaluation run...");
 
-	let mut scorers: Vec<Arc<dyn Scorer>> = Vec::new();
-	
-	// Add exact match scorer
-	if args.exact {
-		scorers.push(Arc::new(ExactMatchScorer));
-	}
-	
-	// Add Levenshtein scorer
-	if let Some(min_sim) = args.levenshtein {
-		scorers.push(Arc::new(LevenshteinScorer::new(min_sim)));
-	}
-	
-	// Add contains scorers
-	if let Some(substring) = args.contains {
-		scorers.push(Arc::new(ContainsScorer::new(substring)));
-	}
-	if let Some(substring) = args.contains_i {
-		scorers.push(Arc::new(ContainsScorer::case_insensitive(substring)));
-	}
-	
-	// Add regex scorer
-	if let Some(pattern) = args.regex {
-		let regex_scorer = RegexScorer::new(&pattern)?;
-		scorers.push(Arc::new(regex_scorer));
-	}
-	
-	// Add JSON scorers
-	if args.json {
-		scorers.push(Arc::new(JsonScorer::new()));
-	}
-	if let Some(schema_path) = args.json_schema {
-		let schema_content = tokio::fs::read_to_string(&schema_path).await?;
-		let schema: serde_json::Value = serde_json::from_str(&schema_content)?;
-		let json_scorer = JsonScorer::with_schema(schema)?;
-		scorers.push(Arc::new(json_scorer));
-	}
-	
-	// Add SQL scorer
-	if args.sql {
-		let dialect = match args.sql_dialect.to_lowercase().as_str() {
-			"postgres" | "postgresql" => SqlDialect::PostgreSQL,
-			"mysql" => SqlDialect::MySQL,
-			"sqlite" => SqlDialect::SQLite,
-			_ => SqlDialect::Generic,
-		};
-		scorers.push(Arc::new(SqlScorer::new(dialect)));
-	}
-	
-	// Default to exact if no scorers specified
-	if scorers.is_empty() {
-		scorers.push(Arc::new(ExactMatchScorer));
-	}
+    // Enable the 'persistence' feature when running tests if it's an optional feature in their Cargo.toml?
+    // Actually, if they depend on evalcraft-core, they need to have the feature enabled in their Cargo.toml 
+    // OR we can try to enable it via command line if it's a workspace feature.
+    // For now, we assume the user has `features = ["persistence"]` or similar in their Cargo.toml
+    // OR evalcraft-core enables it by default (which I set to false for now).
+    // Ideally, `evalcraft run` should work even if they didn't manually enable persistence in their code,
+    // but `cargo test` compiles what is in Cargo.toml.
+    // We can pass `--features evalcraft-core/persistence` to `cargo test`!
 
-	let eval = Eval::builder()
-		.data_source(data)
-		.task(task)
-		.scorers(scorers)
-		.concurrency(args.concurrency)
-		.build()?;
+    let mut cmd = Command::new("cargo");
+    cmd.arg("test");
+    
+    // Only run examples and integration tests, not library unit tests
+    // This prevents running the unit tests in evalcraft-core itself
+    cmd.args(&["--examples", "--tests"]);
+    
+    // Enable the persistence feature in the core library dynamically
+    cmd.args(&["--features", "evalcraft-core/persistence"]);
+    
+    // If the user is running specific examples (common for evals), we might default to running all examples
+    // or specific ones if filtered.
+    
+    if let Some(f) = filter {
+        println!("🔍 Filtering for: {}", f);
+        cmd.arg(f);
+    }
 
-	let result = eval.run().await?;
-	println!("{}", result.summary_table());
+    // Inject the DB path so the child process knows where to save results
+    let db_path = std::env::current_dir()?.join("eval_history.db");
+    cmd.env("EVALCRAFT_DB_PATH", db_path);
+    
+    // We want to capture the status to know if tests passed
+    // We let stdout/stderr inherit so the user sees the progress
+    let status = cmd.status()?;
 
-	if let Some(path) = args.json_out {
-		let json = serde_json::to_string_pretty(&result)?;
-		tokio::fs::write(path, json).await?;
-	}
+    if status.success() {
+        println!("✅ Evaluation run completed successfully.");
+    } else {
+        println!("❌ Evaluation run failed.");
+        // We don't exit with error here because we want the CLI to stay alive in watch mode,
+        // but for single run we might want to propagate the failure code.
+    }
 
-	Ok(())
+    Ok(())
 }
 
+use notify::{RecommendedWatcher, RecursiveMode, Watcher, Event};
+use std::sync::mpsc::channel;
+use std::time::Duration;
+
+async fn run_watch_mode(path: &PathBuf, filter: Option<&str>) -> anyhow::Result<()> {
+    println!("👀 Watching for changes in {:?}...", path);
+
+    // Initial run
+    let _ = run_once(path, filter).await;
+
+    // Create a channel to receive the events.
+    let (tx, rx) = channel();
+
+    // Create a watcher object, delivering debounced events.
+    let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())?;
+
+    // Add a path to be watched. All files and directories at that path and
+    // below will be monitored for changes.
+    watcher.watch(path, RecursiveMode::Recursive)?;
+
+    loop {
+        // Block until we receive an event
+        match rx.recv() {
+            Ok(Ok(Event { kind, paths, .. })) => {
+                // Check if it's a relevant file change (e.g. .rs, .toml)
+                let changed_files: Vec<_> = paths.iter()
+                    .filter(|p| p.extension().map_or(false, |ext| ext == "rs" || ext == "toml"))
+                    .collect();
+
+                if !changed_files.is_empty() {
+                    println!("📝 Change detected ({:?}). Re-running...", kind);
+                    
+                    // Simple debounce: clear queue of any other pending events for a short duration
+                    while let Ok(_) = rx.recv_timeout(Duration::from_millis(100)) {}
+                    
+                    // Determine what to run based on what changed
+                    let target_filter = determine_test_target(&changed_files);
+                    
+                    if let Some(specific_target) = target_filter {
+                        println!("🎯 Running tests for: {}", specific_target);
+                        if let Err(e) = run_specific_test(path, &specific_target).await {
+                            eprintln!("Error running tests: {}", e);
+                        }
+                    } else {
+                        // If we can't determine a specific target (e.g., Cargo.toml changed),
+                        // run all tests
+                        println!("🔄 Running all tests...");
+                        if let Err(e) = run_once(path, filter).await {
+                            eprintln!("Error running tests: {}", e);
+                        }
+                    }
+                    
+                    println!("👀 Waiting for changes...");
+                }
+            }
+            Ok(Err(e)) => eprintln!("Watch error: {:?}", e),
+            Err(e) => eprintln!("Watch channel error: {:?}", e),
+        }
+    }
+}
+
+/// Determine which specific test to run based on the changed files
+fn determine_test_target(changed_files: &[&std::path::PathBuf]) -> Option<String> {
+    for file_path in changed_files {
+        // If it's a test/example file, extract the test name
+        if let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) {
+            // Check if it's in examples/ directory
+            if file_path.to_str().map_or(false, |p| p.contains("examples/")) {
+                // Extract the example name (without .rs extension)
+                if let Some(test_name) = file_name.strip_suffix(".rs") {
+                    return Some(test_name.to_string());
+                }
+            }
+            
+            // Check if it's a test file in tests/ directory
+            if file_path.to_str().map_or(false, |p| p.contains("tests/")) {
+                if let Some(test_name) = file_name.strip_suffix(".rs") {
+                    return Some(test_name.to_string());
+                }
+            }
+        }
+        
+        // If Cargo.toml changed, we need to run everything
+        if file_path.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml") {
+            return None; // Run all tests
+        }
+    }
+    
+    // If we changed a source file in src/, we should run all tests
+    // because we don't know which tests depend on it
+    None
+}
+
+/// Run a specific test by name
+async fn run_specific_test(_path: &PathBuf, test_name: &str) -> anyhow::Result<()> {
+    let mut cmd = Command::new("cargo");
+    cmd.arg("test");
+    
+    // Target the specific example or test
+    cmd.args(&["--example", test_name]);
+    
+    // Enable the persistence feature
+    cmd.args(&["--features", "evalcraft-core/persistence"]);
+    
+    // Inject the DB path
+    let db_path = std::env::current_dir()?.join("eval_history.db");
+    cmd.env("EVALCRAFT_DB_PATH", db_path);
+    
+    let status = cmd.status()?;
+
+    if !status.success() {
+        eprintln!("❌ Test '{}' failed.", test_name);
+    }
+
+    Ok(())
+}
 
